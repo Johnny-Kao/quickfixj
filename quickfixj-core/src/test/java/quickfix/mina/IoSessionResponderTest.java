@@ -19,7 +19,9 @@
 
 package quickfix.mina;
 
+import java.io.IOException;
 import java.net.InetSocketAddress;
+import org.apache.mina.core.future.DefaultWriteFuture;
 import org.apache.mina.core.future.WriteFuture;
 import org.apache.mina.core.session.IoSession;
 
@@ -93,6 +95,22 @@ public class IoSessionResponderTest {
         verify(mockWriteFuture).awaitUninterruptibly(timeout);
         verify(mockWriteFuture).isWritten();
         verifyNoMoreInteractions(mockWriteFuture);
+        verifyNoMoreInteractions(mockIoSession);
+    }
+
+    @Test
+    public void testSynchronousSendWithRealFailedWriteFuture() throws Exception {
+        int timeout = 123;
+        IoSession mockIoSession = mock(IoSession.class);
+        DefaultWriteFuture failedFuture = new DefaultWriteFuture(mockIoSession);
+        failedFuture.setException(new IOException("Test write failure"));
+        when(mockIoSession.write("abcd")).thenReturn(failedFuture);
+        IoSessionResponder responder = new IoSessionResponder(mockIoSession, true, timeout, 0);
+
+        assertTrue(failedFuture.awaitUninterruptibly(timeout));
+        assertFalse(failedFuture.isWritten());
+        assertFalse(responder.send("abcd"));
+        verify(mockIoSession).write("abcd");
         verifyNoMoreInteractions(mockIoSession);
     }
 
